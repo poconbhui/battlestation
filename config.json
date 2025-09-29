@@ -1,0 +1,12 @@
+{
+  "runners": [
+    { "name": "test",
+      "script": "echo test" },
+    { "name": "test loop",
+      "script": "while :; do echo test forever; done" },
+    { "name": "test pcs",
+      "script": "while :; do echo -n test; sleep 1; echo forever; sleep 1; done" },
+    { "name": "sudo test",
+      "script": "echo SUDO_ASKPASS: ${SUDO_ASKPASS}; sudo echo sudo test" }
+  ]
+}
