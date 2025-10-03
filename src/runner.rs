@@ -22,12 +22,12 @@ enum Status {
     Completed {
         status: i32,
         start_time: std::time::SystemTime,
-        end_time: std::time::SystemTime,
+        _end_time: std::time::SystemTime,
     },
 }
 
 #[derive(Debug, Clone)]
-enum ActivityLight {
+pub enum ActivityLight {
     Stdout,
     Stderr,
 }
@@ -47,7 +47,7 @@ pub enum Message {
         start_time: std::time::SystemTime,
     },
 
-    Stdin(String),
+    _Stdin(String),
     Stdout(String),
     Stderr(String),
 
@@ -92,19 +92,23 @@ impl Runner {
         let activity = widget::column![activity_stdout, activity_stderr];
 
         let forever_button = if self.forever {
-            widget::button(crate::icon::to_text(crate::icon::Nerd::RepeatOff))
+            widget::button(crate::icon::to_text(crate::icon::Nerd::RepeatOne))
                 .on_press(Message::SetForever(false))
+                .style(widget::button::success)
         } else {
             widget::button(crate::icon::to_text(crate::icon::Nerd::RepeatOne))
                 .on_press(Message::SetForever(true))
+                .style(widget::button::secondary)
         };
 
         let logs_button = if self.show_logs {
-            widget::button(crate::icon::to_text(crate::icon::Nerd::TextBoxRemoveOutline))
+            widget::button(crate::icon::to_text(crate::icon::Nerd::TextBoxOutline))
                 .on_press(Message::SetShowLogs(false))
+                .style(widget::button::success)
         } else {
             widget::button(crate::icon::to_text(crate::icon::Nerd::TextBoxOutline))
                 .on_press(Message::SetShowLogs(true))
+                .style(widget::button::secondary)
         };
 
         widget::column![
@@ -223,7 +227,7 @@ impl Runner {
                 self.status = Status::Completed {
                     status,
                     start_time,
-                    end_time,
+                    _end_time: end_time,
                 };
 
                 let start_time = start_time.clone();
@@ -232,7 +236,7 @@ impl Runner {
                     Message::ScriptClearStatus { start_time }
                 })
             }
-            Message::Stdin(s) => match &self.status {
+            Message::_Stdin(s) => match &self.status {
                 Status::Running { stdin_tx, .. } => {
                     let name = self.name.clone();
                     let stdin_tx = stdin_tx.clone();
@@ -285,7 +289,7 @@ impl Runner {
     async fn exec(
         name: String,
         script: String,
-        stdin_rx: mpsc::Receiver<String>,
+        _stdin_rx: mpsc::Receiver<String>,
         stdout_tx: mpsc::Sender<String>,
         stderr_tx: mpsc::Sender<String>,
         kill_rx: oneshot::Receiver<()>,
@@ -474,7 +478,7 @@ mod activity {
                         State::On(t) => {
                             if target_t == *t {
                                 self.state = State::Off(std::time::SystemTime::now());
-                            } 
+                            }
                             iced::Task::none()
                         },
                         _ => iced::Task::none()
