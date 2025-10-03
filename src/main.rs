@@ -58,8 +58,7 @@ fn main() -> std::process::ExitCode {
                     Args::command().error(
                         clap::error::ErrorKind::ValueValidation,
                         format!("Error opening config file {config}: {e}")
-                    ).exit();
-                    return std::process::ExitCode::FAILURE;
+                    ).exit()
                 }
             };
 
@@ -92,6 +91,13 @@ fn main() -> std::process::ExitCode {
             }
         }
         Command::Run { command_string } => {
+            // println! will panic when stdout is closed.
+            // Use write! to log file instead
+            use std::io::Write;
+            //let pid = unsafe { libc::getpid() };
+            //let mut w = std::fs::File::create(format!("log-{pid}.txt")).unwrap();
+            let mut w = std::fs::File::create(format!("/dev/null")).unwrap();
+
             let rt = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
                 .build()
@@ -106,13 +112,14 @@ fn main() -> std::process::ExitCode {
                 command.env("SUDO_ASKPASS", "/Users/poconbhui/prog/battlestation/_askpass.sh");
 
                 // Make new session, disconnecting tty
-                let setsid_res = unsafe { libc::setsid() };
+                let _ = unsafe { libc::setsid() };
 
                 // Set PGID of command to child_pid, so we can use killpg
                 command.process_group(0);
 
                 let mut child = command.spawn().unwrap();
                 let child_pid = child.id().unwrap() as i32;
+                let _ = writeln!(&mut w, "child_pid: {child_pid}");
 
                 // Check if parent died by checking if this process has been
                 // reparented
@@ -121,11 +128,11 @@ fn main() -> std::process::ExitCode {
                     loop {
                         let current_ppid = unsafe { libc::getppid() };
                         if current_ppid != prev_ppid {
-                            println!("Parent died");
+                            let _ = writeln!(&mut w, "parent died. prev {prev_ppid} now {current_ppid}");
                             return;
                         }
 
-                        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                        tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
                     }
                 };
 
@@ -141,17 +148,20 @@ fn main() -> std::process::ExitCode {
                     _ = child.wait() => {},
                     // Kill our child when our parent dies
                     _ = parent_died => {
-                        println!("Parent died, cleaning up");
+                        let _ = writeln!(&mut w, "Parent dies, cleaning up");
                         unsafe { libc::kill(child_pid, libc::SIGTERM) };
                     },
                     // Forward signals
                     _ = signal_listener(libc::SIGINT) => {
+                        let _ = writeln!(&mut w, "GOT SIGINT");
                         unsafe { libc::kill(child_pid, libc::SIGINT) };
                     },
                     _ = signal_listener(libc::SIGTERM) => {
+                        let _ = writeln!(&mut w, "GOT SIGTERM");
                         unsafe { libc::kill(child_pid, libc::SIGTERM) };
                     },
                     _ = signal_listener(libc::SIGPIPE) => {
+                        let _ = writeln!(&mut w, "GOT SIGPIPE");
                         unsafe { libc::kill(child_pid, libc::SIGPIPE) };
                     }
                 };
@@ -159,8 +169,11 @@ fn main() -> std::process::ExitCode {
                 // Child has finished, or been sent a deadly signal.
                 // Wait a bit, and kill it if it doesn't finish
                 tokio::select! {
-                    _ = child.wait() => {},
+                    res = child.wait() => {
+                        let _ = writeln!(&mut w, "child closed cleanly: {:?}", res);
+                    },
                     _ = tokio::time::sleep(tokio::time::Duration::from_millis(5000)) => {
+                        let _ = writeln!(&mut w, "chile timed out");
                         unsafe { libc::kill(child_pid, libc::SIGKILL) };
                     }
                 }
@@ -169,17 +182,18 @@ fn main() -> std::process::ExitCode {
                 let child_res = child.wait().await;
 
                 // Child is dead, cleanup any stragglers
+                let _ = writeln!(&mut w, "cleanup stragglers");
                 unsafe { libc::killpg(child_pid, libc::SIGTERM) };
 
                 if let Ok(child_res) = child_res {
                     if child_res.success() {
                         std::process::ExitCode::SUCCESS
                     } else {
-                        println!("Child exited with error: {child_res:?}");
+                        let _ = writeln!(&mut w, "Child exited with error: {child_res:?}");
                         std::process::ExitCode::FAILURE
                     }
                 } else {
-                    println!("Error getting child result: {child_res:?}");
+                    let _ = writeln!(&mut w, "Error getting child result: {child_res:?}");
                     std::process::ExitCode::FAILURE
                 }
             });
