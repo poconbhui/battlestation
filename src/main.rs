@@ -70,18 +70,18 @@ fn main() -> std::process::ExitCode {
                 }
             };
 
-            let res = iced::application("Battlestation", App::update, App::view).run_with(|| {
-                let app = App::new(
-                    config.runners
-                        .into_iter()
-                        .map(Into::into)
-                        .collect()
-                );
+            let res = iced::application("Battlestation", App::update, App::view)
+                .font(icon::ICON_FONT_BYTES)
+                .run_with(|| {
+                    let app = App::new(
+                        config.runners
+                            .into_iter()
+                            .map(Into::into)
+                            .collect()
+                    );
 
-                let load_font = iced::font::load(icon::ICON_FONT_BYTES).discard();
-
-                (app, load_font)
-            });
+                    (app, iced::Task::none())
+                });
 
             if let Err(e) = res {
                 println!("Exiting with error: {e:?}");
@@ -90,6 +90,7 @@ fn main() -> std::process::ExitCode {
                 std::process::ExitCode::SUCCESS
             }
         }
+
         Command::Run { command_string } => {
             // println! will panic when stdout is closed.
             // Use write! to log file instead

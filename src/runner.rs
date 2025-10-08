@@ -70,21 +70,27 @@ impl Runner {
         }
     }
 
-    pub fn view(&self) -> iced::Element<Message> {
+    pub fn view(&self) -> iced::Element<'_, Message> {
         use iced::widget;
 
         let run_button = match self.status {
-            Status::Off => widget::button(icon::to_text(icon::Nerd::PlayOne))
-                .on_press(Message::ScriptRun),
-            Status::Running { start_time, .. } => widget::button(icon::to_text(icon::Nerd::Stop))
-                .on_press(Message::ScriptKill { start_time }),
-            Status::Completed { status, .. } => widget::button(widget::text(status.to_string()))
-                .on_press(Message::ScriptRun)
-                .style(if status == 0 {
-                    widget::button::success
-                } else {
-                    widget::button::danger
-                }),
+            Status::Off => {
+                widget::button(icon::to_text(icon::Nerd::PlayOne))
+                    .on_press(Message::ScriptRun)
+            }
+            Status::Running { start_time, .. } => {
+                widget::button(icon::to_text(icon::Nerd::Stop))
+                    .on_press(Message::ScriptKill { start_time })
+            }
+            Status::Completed { status, .. } => {
+                widget::button(widget::text(status.to_string()))
+                    .on_press(Message::ScriptRun)
+                    .style(if status == 0 {
+                        widget::button::success
+                    } else {
+                        widget::button::danger
+                    })
+            }
         };
 
         let activity_stdout = self.stdout_activity.view().map(|msg| Message::Activity(ActivityLight::Stdout, msg));
@@ -152,6 +158,7 @@ impl Runner {
                     }
                 }
             }
+
             Message::ScriptRun => match self.status {
                 Status::Off | Status::Completed{..}=> {
                     println!("[{}][<Run>] Running task", self.name);
@@ -196,7 +203,8 @@ impl Runner {
                     println!("[{}][<Run>] already running", self.name);
                     iced::Task::none()
                 }
-            },
+            }
+
             Message::ScriptKill {
                 start_time: target_start_time,
             } => match &mut self.status {
@@ -216,7 +224,8 @@ impl Runner {
                     println!("[{}][<Kill>] not running", self.name);
                     iced::Task::none()
                 }
-            },
+            }
+
             Message::ScriptComplete {
                 status,
                 start_time,
@@ -236,6 +245,7 @@ impl Runner {
                     Message::ScriptClearStatus { start_time }
                 })
             }
+
             Message::_Stdin(s) => match &self.status {
                 Status::Running { stdin_tx, .. } => {
                     let name = self.name.clone();
@@ -251,38 +261,38 @@ impl Runner {
                     println!("[{}][<Stdin>] task not running", self.name);
                     iced::Task::none()
                 }
-            },
+            }
             Message::Stdout(s) => {
                 println!("[{}][>] {s}", self.name);
 
                 self.stdout_activity.trigger()
                     .map(|msg| Message::Activity(ActivityLight::Stdout, msg))
-            },
+            }
             Message::Stderr(s) => {
                 println!("[{}][!] {s}", self.name);
 
                 self.stderr_activity.trigger()
                     .map(|msg| Message::Activity(ActivityLight::Stderr, msg))
 
-            },
+            }
 
             Message::Activity(ActivityLight::Stdout, message) => {
                 self.stdout_activity.update(message)
                     .map(|msg| Message::Activity(ActivityLight::Stdout, msg))
-            },
+            }
             Message::Activity(ActivityLight::Stderr, message) => {
                 self.stderr_activity.update(message)
                     .map(|msg| Message::Activity(ActivityLight::Stderr, msg))
-            },
+            }
 
             Message::SetShowLogs(v) => {
                 self.show_logs = v;
                 iced::Task::none()
-            },
+            }
             Message::SetForever(v) => {
                 self.forever = v;
                 iced::Task::none()
-            },
+            }
         }
     }
 
@@ -436,7 +446,7 @@ mod activity {
             }
         }
 
-        pub fn view(&self) -> iced::Element<Message> {
+        pub fn view(&self) -> iced::Element<'_, Message> {
             let icon = match self.state {
                 State::On(_)  => crate::icon::Nerd::SquareRounded,
                 State::Off(_) => crate::icon::Nerd::SquareRoundedOutline,

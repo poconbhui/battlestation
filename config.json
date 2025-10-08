@@ -4,8 +4,12 @@
       "script": "echo test" },
     { "name": "test loop",
       "script": "while :; do echo test forever; done" },
+    { "name": "test loop rand",
+      "script": "while :; do echo test forever $RANDOM; done" },
     { "name": "test pcs",
       "script": "while :; do echo -n test; sleep 1; echo forever; sleep 1; done" },
+    { "name": "loop i",
+      "script": "i=0; while :; do echo test $i; let \"i++\"; sleep 0.1; done" },
     { "name": "sudo test",
       "script": "echo SUDO_ASKPASS: ${SUDO_ASKPASS}; sudo echo sudo test" }
   ]
