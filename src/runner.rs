@@ -9,7 +9,7 @@ pub struct Runner {
     status: Status,
     stdout_activity: activity::Activity,
     stderr_activity: activity::Activity,
-    pub show_logs: bool
+    pub show_logs: bool,
 }
 
 enum Status {
@@ -75,26 +75,27 @@ impl Runner {
 
         let run_button = match self.status {
             Status::Off => {
-                widget::button(icon::to_text(icon::Nerd::PlayOne))
-                    .on_press(Message::ScriptRun)
+                widget::button(icon::to_text(icon::Nerd::PlayOne)).on_press(Message::ScriptRun)
             }
-            Status::Running { start_time, .. } => {
-                widget::button(icon::to_text(icon::Nerd::Stop))
-                    .on_press(Message::ScriptKill { start_time })
-            }
-            Status::Completed { status, .. } => {
-                widget::button(widget::text(status.to_string()))
-                    .on_press(Message::ScriptRun)
-                    .style(if status == 0 {
-                        widget::button::success
-                    } else {
-                        widget::button::danger
-                    })
-            }
+            Status::Running { start_time, .. } => widget::button(icon::to_text(icon::Nerd::Stop))
+                .on_press(Message::ScriptKill { start_time }),
+            Status::Completed { status, .. } => widget::button(widget::text(status.to_string()))
+                .on_press(Message::ScriptRun)
+                .style(if status == 0 {
+                    widget::button::success
+                } else {
+                    widget::button::danger
+                }),
         };
 
-        let activity_stdout = self.stdout_activity.view().map(|msg| Message::Activity(ActivityLight::Stdout, msg));
-        let activity_stderr = self.stderr_activity.view().map(|msg| Message::Activity(ActivityLight::Stderr, msg));
+        let activity_stdout = self
+            .stdout_activity
+            .view()
+            .map(|msg| Message::Activity(ActivityLight::Stdout, msg));
+        let activity_stderr = self
+            .stderr_activity
+            .view()
+            .map(|msg| Message::Activity(ActivityLight::Stderr, msg));
         let activity = widget::column![activity_stdout, activity_stderr];
 
         let forever_button = if self.forever {
@@ -131,36 +132,34 @@ impl Runner {
             Message::ScriptClearStatus {
                 start_time: target_start_time,
                 ..
-            } => {
-                match self.status {
-                    Status::Completed {
-                        start_time: status_start_time,
-                        ..
-                    } => {
-                        if status_start_time == target_start_time {
-                            self.status = Status::Off;
-                            if self.forever {
-                                iced::Task::done(Message::ScriptRun)
-                            } else {
-                                iced::Task::none()
-                            }
+            } => match self.status {
+                Status::Completed {
+                    start_time: status_start_time,
+                    ..
+                } => {
+                    if status_start_time == target_start_time {
+                        self.status = Status::Off;
+                        if self.forever {
+                            iced::Task::done(Message::ScriptRun)
                         } else {
-                            println!("[{}][<ClearStatus>] start_time mismatched", self.name);
                             iced::Task::none()
                         }
-                    }
-                    _ => {
-                        println!(
-                            "[{}][<ClearStatus>] script not in completed state",
-                            self.name
-                        );
+                    } else {
+                        println!("[{}][<ClearStatus>] start_time mismatched", self.name);
                         iced::Task::none()
                     }
                 }
-            }
+                _ => {
+                    println!(
+                        "[{}][<ClearStatus>] script not in completed state",
+                        self.name
+                    );
+                    iced::Task::none()
+                }
+            },
 
             Message::ScriptRun => match self.status {
-                Status::Off | Status::Completed{..}=> {
+                Status::Off | Status::Completed { .. } => {
                     println!("[{}][<Run>] Running task", self.name);
 
                     let (stdin_tx, stdin_rx) = mpsc::channel(1024);
@@ -170,7 +169,7 @@ impl Runner {
 
                     let start_time = std::time::SystemTime::now();
                     self.status = Status::Running {
-                        start_time: start_time.clone(),
+                        start_time,
                         stdin_tx,
                         kill_tx: Some(kill_tx),
                     };
@@ -187,23 +186,21 @@ impl Runner {
                                 stderr_tx,
                                 kill_rx,
                             ),
-                            move |status| {
-                                Message::ScriptComplete {
-                                    status,
-                                    start_time,
-                                    end_time: std::time::SystemTime::now(),
-                                }
+                            move |status| Message::ScriptComplete {
+                                status,
+                                start_time,
+                                end_time: std::time::SystemTime::now(),
                             },
                         ),
-                        iced::Task::run(stdout_stream, |s| Message::Stdout(s)),
-                        iced::Task::run(stderr_stream, |s| Message::Stderr(s)),
+                        iced::Task::run(stdout_stream, Message::Stdout),
+                        iced::Task::run(stderr_stream, Message::Stderr),
                     ])
                 }
                 _ => {
                     println!("[{}][<Run>] already running", self.name);
                     iced::Task::none()
                 }
-            }
+            },
 
             Message::ScriptKill {
                 start_time: target_start_time,
@@ -213,10 +210,10 @@ impl Runner {
                     kill_tx,
                     ..
                 } => {
-                    if *start_time == target_start_time {
-                        if let Some(kill_tx) = kill_tx.take() {
-                            let _ = kill_tx.send(());
-                        }
+                    if *start_time == target_start_time
+                        && let Some(kill_tx) = kill_tx.take()
+                    {
+                        let _ = kill_tx.send(());
                     }
                     iced::Task::none()
                 }
@@ -224,7 +221,7 @@ impl Runner {
                     println!("[{}][<Kill>] not running", self.name);
                     iced::Task::none()
                 }
-            }
+            },
 
             Message::ScriptComplete {
                 status,
@@ -239,7 +236,6 @@ impl Runner {
                     _end_time: end_time,
                 };
 
-                let start_time = start_time.clone();
                 iced::Task::future(async move {
                     tokio::time::sleep(tokio::time::Duration::from_millis(2000)).await;
                     Message::ScriptClearStatus { start_time }
@@ -261,29 +257,31 @@ impl Runner {
                     println!("[{}][<Stdin>] task not running", self.name);
                     iced::Task::none()
                 }
-            }
+            },
+
             Message::Stdout(s) => {
                 println!("[{}][>] {s}", self.name);
 
-                self.stdout_activity.trigger()
+                self.stdout_activity
+                    .trigger()
                     .map(|msg| Message::Activity(ActivityLight::Stdout, msg))
             }
             Message::Stderr(s) => {
                 println!("[{}][!] {s}", self.name);
 
-                self.stderr_activity.trigger()
-                    .map(|msg| Message::Activity(ActivityLight::Stderr, msg))
-
-            }
-
-            Message::Activity(ActivityLight::Stdout, message) => {
-                self.stdout_activity.update(message)
-                    .map(|msg| Message::Activity(ActivityLight::Stdout, msg))
-            }
-            Message::Activity(ActivityLight::Stderr, message) => {
-                self.stderr_activity.update(message)
+                self.stderr_activity
+                    .trigger()
                     .map(|msg| Message::Activity(ActivityLight::Stderr, msg))
             }
+
+            Message::Activity(ActivityLight::Stdout, message) => self
+                .stdout_activity
+                .update(message)
+                .map(|msg| Message::Activity(ActivityLight::Stdout, msg)),
+            Message::Activity(ActivityLight::Stderr, message) => self
+                .stderr_activity
+                .update(message)
+                .map(|msg| Message::Activity(ActivityLight::Stderr, msg)),
 
             Message::SetShowLogs(v) => {
                 self.show_logs = v;
@@ -309,7 +307,7 @@ impl Runner {
         println!("[{name}] ---- BEGIN ----");
 
         let current_exe = match std::env::current_exe() {
-            Ok(current_exe) => { current_exe },
+            Ok(current_exe) => current_exe,
             Err(err) => {
                 let err = format!("Unable to find current exe: {err:?}");
                 println!("[{name}][!] {err}");
@@ -347,7 +345,7 @@ impl Runner {
         let _ = stdin.shutdown().await;
 
         let _name = name.clone();
-        let reading_stdout_handle = tokio::task::spawn( async move {
+        let reading_stdout_handle = tokio::task::spawn(async move {
             let name = _name;
             let mut stdout_open = true;
             let mut stderr_open = true;
@@ -366,9 +364,7 @@ impl Runner {
                             Ok(n) => {
                                 let s = String::from_utf8_lossy(&stdout_buf[..n]).into_owned();
                                 let _ = stdout_tx.send(s).await;
-                                for i in 0..n {
-                                    stdout_buf[i] = 0;
-                                }
+                                stdout_buf[0..n].fill(0);
                             },
                             Err(e) => {
                                 println!("[{name}][>][!] io error: {e:?}");
@@ -383,9 +379,7 @@ impl Runner {
                             Ok(n) => {
                                 let s = String::from_utf8_lossy(&stderr_buf[..n]).into_owned();
                                 let _ = stderr_tx.send(s).await;
-                                for i in 0..n {
-                                    stdout_buf[i] = 0;
-                                }
+                                stderr_buf[0..n].fill(0);
                             },
                             Err(e) => {
                                 println!("[{name}][!][!] io error: {e:?}");
@@ -410,11 +404,7 @@ impl Runner {
         println!("[{name}] ---- END ----");
 
         if let Ok(res) = res {
-            if res.success() {
-                0
-            } else {
-                1
-            }
+            if res.success() { 0 } else { 1 }
         } else {
             1
         }
@@ -448,13 +438,11 @@ mod activity {
 
         pub fn view(&self) -> iced::Element<'_, Message> {
             let icon = match self.state {
-                State::On(_)  => crate::icon::Nerd::SquareRounded,
+                State::On(_) => crate::icon::Nerd::SquareRounded,
                 State::Off(_) => crate::icon::Nerd::SquareRoundedOutline,
             };
 
-            crate::icon::to_text(icon)
-                .color(self.color)
-                .into()
+            crate::icon::to_text(icon).color(self.color).into()
         }
 
         pub fn trigger(&mut self) -> iced::Task<Message> {
@@ -465,35 +453,31 @@ mod activity {
             let on_len = std::time::Duration::from_millis(100);
             let off_len = std::time::Duration::from_millis(50);
             match message {
-                Message::Trigger => {
-                    match &mut self.state {
-                        State::Off(t) => {
-                            if std::time::SystemTime::now() >= *t + off_len {
-                                let changed_at = std::time::SystemTime::now();
-                                self.state = State::On(changed_at.clone());
+                Message::Trigger => match &mut self.state {
+                    State::Off(t) => {
+                        if std::time::SystemTime::now() >= *t + off_len {
+                            let changed_at = std::time::SystemTime::now();
+                            self.state = State::On(changed_at);
 
-                                iced::Task::future(async move {
-                                    tokio::time::sleep(on_len).await;
-                                    Message::Clear(changed_at)
-                                })
-                            } else {
-                                iced::Task::none()
-                            }
-                        },
-                        _ => iced::Task::none()
-                    }
-                },
-                Message::Clear(target_t) => {
-                    match &mut self.state {
-                        State::On(t) => {
-                            if target_t == *t {
-                                self.state = State::Off(std::time::SystemTime::now());
-                            }
+                            iced::Task::future(async move {
+                                tokio::time::sleep(on_len).await;
+                                Message::Clear(changed_at)
+                            })
+                        } else {
                             iced::Task::none()
-                        },
-                        _ => iced::Task::none()
+                        }
                     }
-                }
+                    _ => iced::Task::none(),
+                },
+                Message::Clear(target_t) => match &mut self.state {
+                    State::On(t) => {
+                        if target_t == *t {
+                            self.state = State::Off(std::time::SystemTime::now());
+                        }
+                        iced::Task::none()
+                    }
+                    _ => iced::Task::none(),
+                },
             }
         }
     }

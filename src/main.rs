@@ -18,7 +18,7 @@ struct Args {
 enum Command {
     /// Run the battlestation UI (default)
     UI {
-        #[arg(short,long)]
+        #[arg(short, long)]
         config: String,
     },
     /// Run a command, ensure children are cleaned up in SIGTERM
@@ -52,18 +52,20 @@ fn main() -> std::process::ExitCode {
     match args.command {
         Command::UI { config } => {
             let config = match std::fs::read_to_string(&config) {
-                Ok(fp) => { fp },
+                Ok(fp) => fp,
                 Err(e) => {
                     use clap::CommandFactory;
-                    Args::command().error(
-                        clap::error::ErrorKind::ValueValidation,
-                        format!("Error opening config file {config}: {e}")
-                    ).exit()
+                    Args::command()
+                        .error(
+                            clap::error::ErrorKind::ValueValidation,
+                            format!("Error opening config file {config}: {e}"),
+                        )
+                        .exit()
                 }
             };
 
             let config = match serde_json::from_str::<Config>(&config) {
-                Ok(config) => { config },
+                Ok(config) => config,
                 Err(e) => {
                     println!("Error parsing json: {e}");
                     return std::process::ExitCode::FAILURE;
@@ -73,12 +75,7 @@ fn main() -> std::process::ExitCode {
             let res = iced::application("Battlestation", App::update, App::view)
                 .font(icon::ICON_FONT_BYTES)
                 .run_with(|| {
-                    let app = App::new(
-                        config.runners
-                            .into_iter()
-                            .map(Into::into)
-                            .collect()
-                    );
+                    let app = App::new(config.runners.into_iter().map(Into::into).collect());
 
                     (app, iced::Task::none())
                 });
@@ -97,20 +94,23 @@ fn main() -> std::process::ExitCode {
             use std::io::Write;
             //let pid = unsafe { libc::getpid() };
             //let mut w = std::fs::File::create(format!("log-{pid}.txt")).unwrap();
-            let mut w = std::fs::File::create(format!("/dev/null")).unwrap();
+            let mut w = std::fs::File::create("/dev/null").unwrap();
 
             let rt = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
                 .build()
                 .unwrap();
 
-            let res = rt.block_on(async {
+            rt.block_on(async {
                 let mut command = tokio::process::Command::new("/bin/bash");
                 command.arg("-c");
                 command.arg(command_string);
 
                 // Get sudo to make gui prompt for password
-                command.env("SUDO_ASKPASS", "/Users/poconbhui/prog/battlestation/_askpass.sh");
+                command.env(
+                    "SUDO_ASKPASS",
+                    "/Users/poconbhui/prog/battlestation/_askpass.sh",
+                );
 
                 // Make new session, disconnecting tty
                 let _ = unsafe { libc::setsid() };
@@ -129,7 +129,10 @@ fn main() -> std::process::ExitCode {
                     loop {
                         let current_ppid = unsafe { libc::getppid() };
                         if current_ppid != prev_ppid {
-                            let _ = writeln!(&mut w, "parent died. prev {prev_ppid} now {current_ppid}");
+                            let _ = writeln!(
+                                &mut w,
+                                "parent died. prev {prev_ppid} now {current_ppid}"
+                            );
                             return;
                         }
 
@@ -197,9 +200,7 @@ fn main() -> std::process::ExitCode {
                     let _ = writeln!(&mut w, "Error getting child result: {child_res:?}");
                     std::process::ExitCode::FAILURE
                 }
-            });
-
-            res
+            })
         }
     }
 }
